@@ -1,4 +1,3 @@
-//go:build v4
 package web
 
 import (
@@ -33,7 +32,7 @@ func (r *router) addRoute(method string, path string, handler HandleFunc) {
 		panic("web: 路由必须以 / 开头")
 	}
 
-	if path != "/" && path[len(path) - 1] == '/' {
+	if path != "/" && path[len(path)-1] == '/' {
 		panic("web: 路由不能以 / 结尾")
 	}
 
@@ -114,27 +113,6 @@ type node struct {
 	paramChild *node
 }
 
-// child 返回子节点
-// 第一个返回值 *node 是命中的节点
-// 第二个返回值 bool 代表是否是命中参数路由
-// 第三个返回值 bool 代表是否命中
-func (n *node) childOf(path string) (*node, bool, bool) {
-	if n.children == nil {
-		if n.paramChild != nil {
-			return n.paramChild, true, true
-		}
-		return n.starChild, false, n.starChild != nil
-	}
-	res, ok := n.children[path]
-	if !ok {
-		if n.paramChild != nil {
-			return n.paramChild, true, true
-		}
-		return n.starChild, false, n.starChild != nil
-	}
-	return res, false, ok
-}
-
 // childOrCreate 查找子节点，
 // 首先会判断 path 是不是通配符路径
 // 其次判断 path 是不是参数路径，即以 : 开头的路径
@@ -177,15 +155,36 @@ func (n *node) childOrCreate(path string) *node {
 	return child
 }
 
+// child 返回子节点
+// 第一个返回值 *node 是命中的节点
+// 第二个返回值 bool 代表是否是命中参数路由
+// 第三个返回值 bool 代表是否命中
+func (n *node) childOf(path string) (*node, bool, bool) {
+	if n.children == nil {
+		if n.paramChild != nil {
+			return n.paramChild, true, true
+		}
+		return n.starChild, false, n.starChild != nil
+	}
+	res, ok := n.children[path]
+	if !ok {
+		if n.paramChild != nil {
+			return n.paramChild, true, true
+		}
+		return n.starChild, false, n.starChild != nil
+	}
+	return res, false, ok
+}
+
 type matchInfo struct {
-	n *node
+	n          *node
 	pathParams map[string]string
 }
 
 func (m *matchInfo) addValue(key string, value string) {
 	if m.pathParams == nil {
 		// 大多数情况，参数路径只会有一段
-		m.pathParams = map[string]string{key:value}
+		m.pathParams = map[string]string{key: value}
 	}
 	m.pathParams[key] = value
 }
