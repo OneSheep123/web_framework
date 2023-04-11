@@ -71,6 +71,15 @@ func Test_router_AddRoute(t *testing.T) {
 			method: http.MethodGet,
 			path:   "/param/:id/*",
 		},
+		// 正则路由
+		{
+			method: http.MethodGet,
+			path:   "/home/:(.*)",
+		},
+		{
+			method: http.MethodGet,
+			path:   "/home/name/:(^.+$)",
+		},
 	}
 
 	mockHandler := func(ctx *Context) {}
@@ -102,6 +111,22 @@ func Test_router_AddRoute(t *testing.T) {
 							handler:  mockHandler,
 						},
 					},
+					"home": {
+						path: "home",
+						regularChild: &node{
+							path:    ":(.*)",
+							handler: mockHandler,
+						},
+						children: map[string]*node{
+							"name": {
+								path: "name",
+								regularChild: &node{
+									path:    ":(^.+$)",
+									handler: mockHandler,
+								},
+							},
+						},
+					},
 				},
 				starChild: &node{
 					path: "*",
@@ -124,9 +149,12 @@ func Test_router_AddRoute(t *testing.T) {
 	}
 	msg, ok := wantRouter.equal(r)
 	assert.True(t, ok, msg)
+}
 
+func Test_panic_addRoute(t *testing.T) {
 	// 非法用例
-	r = newRouter()
+	r := newRouter()
+	mockHandler := func(ctx *Context) {}
 
 	// 空字符串
 	assert.PanicsWithValue(t, "web: 路由是空字符串", func() {
@@ -187,6 +215,11 @@ func Test_router_AddRoute(t *testing.T) {
 		r.addRoute(http.MethodGet, "/a/b/c/:id", mockHandler)
 		r.addRoute(http.MethodGet, "/a/b/c/:name", mockHandler)
 	})
+
+	assert.PanicsWithValue(t, "web: 当前路径上已经注册正则路径 [:(^.++)]", func() {
+		r.addRoute(http.MethodGet, "/home/name/:(^.+$)", mockHandler)
+		r.addRoute(http.MethodGet, "/home/name/:(^.++)", mockHandler)
+	})
 }
 
 func (r router) equal(y router) (string, bool) {
@@ -228,6 +261,20 @@ func (n *node) equal(y *node) (string, bool) {
 		str, ok := n.starChild.equal(y.starChild)
 		if !ok {
 			return fmt.Sprintf("%s 通配符节点不匹配 %s", n.path, str), false
+		}
+	}
+
+	if n.paramChild != nil {
+		str, ok := n.paramChild.equal(y.paramChild)
+		if !ok {
+			return fmt.Sprintf("%s 参数节点不匹配 %s", n.path, str), false
+		}
+	}
+
+	if n.regularChild != nil {
+		str, ok := n.regularChild.equal(y.regularChild)
+		if !ok {
+			return fmt.Sprintf("%s 正则节点不匹配 %s", n.path, str), false
 		}
 	}
 
@@ -281,6 +328,11 @@ func Test_router_findRoute(t *testing.T) {
 		{
 			method: http.MethodGet,
 			path:   "/param/:id/*",
+		},
+		// 正则路由
+		{
+			method: http.MethodGet,
+			path:   "/home/:((a|b|c)name)",
 		},
 	}
 
@@ -412,7 +464,6 @@ func Test_router_findRoute(t *testing.T) {
 				pathParams: map[string]string{"id": "123"},
 			},
 		},
-
 		{
 			// 命中 /param/:id/detail
 			name:   ":id*",
@@ -426,6 +477,41 @@ func Test_router_findRoute(t *testing.T) {
 				},
 				pathParams: map[string]string{"id": "123"},
 			},
+		},
+
+		{
+			// 命中 /param/:id/aiv/789/655
+			name:   ":id* list",
+			method: http.MethodGet,
+			path:   "/param/123/aiv/789/655",
+			found:  true,
+			mi: &matchInfo{
+				n: &node{
+					path:    "*",
+					handler: mockHandler,
+				},
+				pathParams: map[string]string{"id": "123"},
+			},
+		},
+		{
+			// 命中 /param/:((a|b|c)name)
+			name:   ":((a|b|c)name)",
+			method: http.MethodGet,
+			path:   "/home/cname",
+			found:  true,
+			mi: &matchInfo{
+				n: &node{
+					path:    ":((a|b|c)name)",
+					handler: mockHandler,
+				},
+			},
+		},
+		{
+			// 未命中 /param/:((a|b|c)name)
+			name:   "no :((a|b|c)name)",
+			method: http.MethodGet,
+			path:   "/home/dname",
+			found:  false,
 		},
 	}
 

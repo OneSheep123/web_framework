@@ -11,5 +11,9 @@ func TestServer(t *testing.T) {
 		ctx.Resp.Write([]byte("hello, user"))
 	})
 
+	s.Get("/user/:((a|b|c)name)", func(ctx *Context) {
+		ctx.Resp.Write([]byte("hello, reg"))
+	})
+
 	s.Start(":8081")
 }

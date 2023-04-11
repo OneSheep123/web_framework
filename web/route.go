@@ -2,6 +2,7 @@ package web
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -110,7 +111,11 @@ type node struct {
 	// 通配符 * 表达的节点，任意匹配
 	starChild *node
 
+	// 参数路由 节点
 	paramChild *node
+
+	// 正则路由 节点
+	regularChild *node
 }
 
 // childOrCreate 查找子节点，
@@ -123,13 +128,33 @@ func (n *node) childOrCreate(path string) *node {
 		if n.paramChild != nil {
 			panic(fmt.Sprintf("web: 非法路由，已有路径参数路由。不允许同时注册通配符路由和参数路由 [%s]", path))
 		}
+		if n.regularChild != nil {
+			panic(fmt.Sprintf("web: 非法路由，已有路径正则路由。不允许同时注册正则路由和参数路由 [%s]", path))
+		}
 		if n.starChild == nil {
 			n.starChild = &node{path: path}
 		}
 		return n.starChild
 	}
 
-	// 以 : 开头，我们认为是参数路由
+	// 判断当前路径是否为正则路径
+	if n.isRegexPath(path) {
+		if n.regularChild != nil && n.path != path {
+			panic(fmt.Sprintf("web: 当前路径上已经注册正则路径 [%s]", path))
+		}
+		if n.paramChild != nil {
+			panic(fmt.Sprintf("web: 非法路由，已有路径参数路由。不允许同时注册正则路由和参数路由 [%s]", path))
+		}
+		if n.starChild != nil {
+			panic(fmt.Sprintf("web: 非法路由，已有路径通配符路由。不允许同时注册正则路由和通配符路由 [%s]", path))
+		}
+		if n.regularChild == nil {
+			n.regularChild = &node{path: path}
+		}
+		return n.regularChild
+	}
+
+	// 剩下以 : 开头，我们认为是参数路由
 	if path[0] == ':' {
 		if n.starChild != nil {
 			panic(fmt.Sprintf("web: 非法路由，已有通配符路由。不允许同时注册通配符路由和参数路由 [%s]", path))
@@ -155,23 +180,63 @@ func (n *node) childOrCreate(path string) *node {
 	return child
 }
 
+// isRegexPath 用于解析判断当路由是不是正则表达式
+// 以:开头,首位为(),则为正则表达式
+func (n *node) isRegexPath(path string) bool {
+	if path[0] != ':' {
+		return false
+	}
+	if path[1] == '(' && path[len(path)-1] == ')' {
+		return true
+	}
+	return false
+}
+
+// isMatchRegexNode 当前路径是否匹配到正则路由节点
+func (n *node) isMatchRegexNode(path string) bool {
+	seg := n.path[1:]
+	reg, err := regexp.Compile(seg)
+	if err != nil {
+		panic(fmt.Sprintf("web: 路径正则匹配异常[%s]", path))
+	}
+	return reg.MatchString(path)
+}
+
 // child 返回子节点
 // 第一个返回值 *node 是命中的节点
 // 第二个返回值 bool 代表是否是命中参数路由
 // 第三个返回值 bool 代表是否命中
 func (n *node) childOf(path string) (*node, bool, bool) {
 	if n.children == nil {
+		if n.regularChild != nil && n.regularChild.isMatchRegexNode(path) {
+			return n.regularChild, false, true
+		}
 		if n.paramChild != nil {
 			return n.paramChild, true, true
 		}
-		return n.starChild, false, n.starChild != nil
+		if n.starChild != nil {
+			return n.starChild, false, true
+		}
+		if n.path == "*" {
+			return n, false, true
+		}
+		return nil, false, false
 	}
 	res, ok := n.children[path]
 	if !ok {
+		if n.regularChild != nil && n.regularChild.isMatchRegexNode(path) {
+			return n.regularChild, false, true
+		}
 		if n.paramChild != nil {
 			return n.paramChild, true, true
 		}
-		return n.starChild, false, n.starChild != nil
+		if n.starChild != nil {
+			return n.starChild, false, true
+		}
+		if n.path == "*" {
+			return n, false, true
+		}
+		return nil, false, false
 	}
 	return res, false, ok
 }
