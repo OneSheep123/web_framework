@@ -2,7 +2,10 @@
 
 package web
 
-import "net/http"
+import (
+	"log"
+	"net/http"
+)
 
 type HandleFunc func(ctx *Context)
 
@@ -25,12 +28,31 @@ var _ Server = &HTTPServer{}
 
 type HTTPServer struct {
 	router
+	mdls []Middleware
+	log  func(msg string, args ...interface{})
 }
 
-func NewHTTPServer() *HTTPServer {
-	return &HTTPServer{
-		router: newRouter(),
+type HTTPServerOptions func(s *HTTPServer)
+
+// ServerWithMiddleware 注册中间件
+func ServerWithMiddleware(mdls ...Middleware) HTTPServerOptions {
+	return func(s *HTTPServer) {
+		s.mdls = mdls
 	}
+}
+
+func NewHTTPServer(options ...HTTPServerOptions) *HTTPServer {
+	httpServer := &HTTPServer{
+		router: newRouter(),
+		// 设置默认log函数
+		log: func(msg string, args ...interface{}) {
+			log.Fatalln(msg)
+		},
+	}
+	for _, opt := range options {
+		opt(httpServer)
+	}
+	return httpServer
 }
 
 // ServeHTTP HTTPServer 处理请求的入口
@@ -39,7 +61,35 @@ func (s *HTTPServer) ServeHTTP(writer http.ResponseWriter, request *http.Request
 		Req:  request,
 		Resp: writer,
 	}
-	s.serve(ctx)
+
+	root := s.serve
+	// 这里并还没开始执行，只是从后面开始遍历，注册前面一个middleware中的next
+	for i := len(s.mdls) - 1; i >= 0; i-- {
+		root = s.mdls[i](root)
+	}
+	var m Middleware = func(next HandleFunc) HandleFunc {
+		return func(ctx *Context) {
+			next(ctx)
+			s.flashResp(ctx)
+		}
+	}
+	root = m(root)
+	// 这里就是开始从前往后执行了
+	root(ctx)
+}
+
+func (s *HTTPServer) flashResp(ctx *Context) {
+	if ctx.RespStatusCode != 0 {
+		ctx.Resp.WriteHeader(ctx.RespStatusCode)
+	}
+	if ctx.Resp == nil {
+		s.log("当前Resp为nil")
+		return
+	}
+	n, err := ctx.Resp.Write(ctx.RespData)
+	if err != nil || n != len(ctx.RespData) {
+		s.log("写入响应失败 %v", err)
+	}
 }
 
 // Start 启动服务器
@@ -63,5 +113,6 @@ func (s *HTTPServer) serve(ctx *Context) {
 		return
 	}
 	ctx.PathParams = mi.pathParams
+	ctx.MatchRoute = mi.n.matchRoute
 	mi.n.handler(ctx)
 }

@@ -51,6 +51,7 @@ func (r *router) addRoute(method string, path string, handler HandleFunc) {
 			panic("web: 路由冲突[/]")
 		}
 		root.handler = handler
+		root.matchRoute = "/"
 		return
 	}
 
@@ -66,6 +67,7 @@ func (r *router) addRoute(method string, path string, handler HandleFunc) {
 		panic(fmt.Sprintf("web: 路由冲突[%s]", path))
 	}
 	root.handler = handler
+	root.matchRoute = path
 }
 
 // findRoute 查找对应的节点
@@ -103,7 +105,9 @@ func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 // 3. 通配符匹配：*
 // 这是不回溯匹配
 type node struct {
-	path string
+	// 对应的路由
+	matchRoute string
+	path       string
 	// children 子节点
 	// 子节点的 path => node
 	children map[string]*node
