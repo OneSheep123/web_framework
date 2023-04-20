@@ -1,6 +1,9 @@
 package web
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+)
 
 type HandleFunc func(ctx *Context)
 
@@ -23,12 +26,29 @@ var _ Server = &HTTPServer{}
 
 type HTTPServer struct {
 	router
+	mdls []Middleware
+	Log  func(log string)
 }
 
-func NewHTTPServer() *HTTPServer {
-	return &HTTPServer{
-		router: newRouter(),
+type HTTPServerOptions func(server *HTTPServer)
+
+func ServerAddMiddleware(mdls ...Middleware) HTTPServerOptions {
+	return func(server *HTTPServer) {
+		server.mdls = mdls
 	}
+}
+
+func NewHTTPServer(options ...HTTPServerOptions) *HTTPServer {
+	server := &HTTPServer{
+		router: newRouter(),
+		Log: func(log string) {
+			fmt.Println(log)
+		},
+	}
+	for _, opt := range options {
+		opt(server)
+	}
+	return server
 }
 
 // ServeHTTP HTTPServer 处理请求的入口
@@ -37,7 +57,21 @@ func (s *HTTPServer) ServeHTTP(writer http.ResponseWriter, request *http.Request
 		Req:  request,
 		Resp: writer,
 	}
-	s.serve(ctx)
+
+	root := s.serve
+	for index := len(s.mdls) - 1; index >= 0; index-- {
+		root = s.mdls[index](root)
+	}
+
+	var m = func(next HandleFunc) HandleFunc {
+		return func(ctx *Context) {
+			next(ctx)
+			ctx.Resp.WriteHeader(ctx.RespStatusCode)
+			ctx.Resp.Write(ctx.RespData)
+		}
+	}
+	root = m(root)
+	root(ctx)
 }
 
 // Start 启动服务器
@@ -56,10 +90,11 @@ func (s *HTTPServer) Get(path string, handler HandleFunc) {
 func (s *HTTPServer) serve(ctx *Context) {
 	mi, ok := s.findRoute(ctx.Req.Method, ctx.Req.URL.Path)
 	if !ok || mi.n == nil || mi.n.handler == nil {
-		ctx.Resp.WriteHeader(404)
-		ctx.Resp.Write([]byte("Not Found"))
+		ctx.RespStatusCode = 404
+		ctx.RespData = []byte(`NOT FOUND`)
 		return
 	}
 	ctx.PathParams = mi.pathParams
+	ctx.MatchRoute = mi.n.matchRoute
 	mi.n.handler(ctx)
 }
