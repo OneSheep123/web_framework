@@ -24,7 +24,7 @@ func newRouter() router {
 // - 不能在同一个位置注册不同的参数路由，例如 /user/:id 和 /user/:name 冲突
 // - 不能在同一个位置同时注册通配符路由和参数路由，例如 /user/:id 和 /user/* 冲突
 // - 同名路径参数，在路由匹配的时候，值会被覆盖。例如 /user/:id/abc/:id，那么 /user/123/abc/456 最终 id = 456
-func (r *router) addRoute(method string, path string, handler HandleFunc) {
+func (r *router) addRoute(method string, path string, handler HandleFunc, mdls ...Middleware) {
 	if path == "" {
 		panic("web: 路由是空字符串")
 	}
@@ -49,6 +49,7 @@ func (r *router) addRoute(method string, path string, handler HandleFunc) {
 		}
 		root.handler = handler
 		root.matchRoute = path
+		root.mdls = append(root.mdls, mdls...)
 		return
 	}
 
@@ -65,6 +66,7 @@ func (r *router) addRoute(method string, path string, handler HandleFunc) {
 	}
 	root.handler = handler
 	root.matchRoute = path
+	root.mdls = append(root.mdls, mdls...)
 }
 
 // findRoute 查找对应的节点
@@ -76,23 +78,60 @@ func (r *router) findRoute(method string, path string) (*matchInfo, bool) {
 	}
 
 	if path == "/" {
-		return &matchInfo{n: root}, true
+		return &matchInfo{n: root, mdls: root.mdls}, true
 	}
 
 	segs := strings.Split(strings.Trim(path, "/"), "/")
 	mi := &matchInfo{}
+	cur := root
 	for _, s := range segs {
 		var matchParam bool
-		root, matchParam, ok = root.childOf(s)
+		cur, matchParam, ok = cur.childOf(s)
 		if !ok {
 			return nil, false
 		}
 		if matchParam {
-			mi.addValue(root.path[1:], s)
+			mi.addValue(cur.path[1:], s)
 		}
 	}
-	mi.n = root
+	mi.n = cur
+	// 进行获取middleware数组
+	mi.mdls = r.findMiddleware(root, segs)
 	return mi, true
+}
+
+// findMiddleware 获取匹配到路径的所有中间件
+func (r *router) findMiddleware(root *node, segs []string) (res []Middleware) {
+	// 对于 "/"节点
+	if root.mdls != nil {
+		res = append(res, root.mdls...)
+	}
+	levelNodes := []*node{root}
+	indexSeg := 0
+	for len(levelNodes) > 0 && indexSeg < len(segs) {
+		var nextLevelNodes []*node
+		for _, n := range levelNodes {
+			// 先匹配*
+			if n.starChild != nil {
+				res = append(res, n.starChild.mdls...)
+				nextLevelNodes = append(nextLevelNodes, n.starChild)
+			}
+			if n.paramChild != nil {
+				res = append(res, n.paramChild.mdls...)
+				nextLevelNodes = append(nextLevelNodes, n.paramChild)
+			}
+			if n.children == nil {
+				continue
+			}
+			if staticChild, ok := n.children[segs[indexSeg]]; ok {
+				res = append(res, staticChild.mdls...)
+				nextLevelNodes = append(nextLevelNodes, staticChild)
+			}
+		}
+		indexSeg++
+		levelNodes = nextLevelNodes
+	}
+	return
 }
 
 // node 代表路由树的节点
@@ -114,6 +153,8 @@ type node struct {
 	starChild *node
 
 	paramChild *node
+
+	mdls []Middleware
 }
 
 // childOrCreate 查找子节点，
@@ -182,6 +223,7 @@ func (n *node) childOf(path string) (*node, bool, bool) {
 type matchInfo struct {
 	n          *node
 	pathParams map[string]string
+	mdls       []Middleware
 }
 
 func (m *matchInfo) addValue(key string, value string) {

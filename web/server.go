@@ -16,7 +16,7 @@ type Server interface {
 
 	// addRoute 注册一个路由
 	// method 是 HTTP 方法
-	addRoute(method string, path string, handler HandleFunc)
+	addRoute(method string, path string, handler HandleFunc, mdls ...Middleware)
 	// 我们并不采取这种设计方案
 	// addRoute(method string, path string, handlers... HandleFunc)
 }
@@ -49,6 +49,10 @@ func NewHTTPServer(options ...HTTPServerOptions) *HTTPServer {
 		opt(server)
 	}
 	return server
+}
+
+func (s *HTTPServer) Use(method string, path string, mdls ...Middleware) {
+	s.addRoute(method, path, nil, mdls...)
 }
 
 // ServeHTTP HTTPServer 处理请求的入口
@@ -96,5 +100,11 @@ func (s *HTTPServer) serve(ctx *Context) {
 	}
 	ctx.PathParams = mi.pathParams
 	ctx.MatchRoute = mi.n.matchRoute
-	mi.n.handler(ctx)
+	root := mi.n.handler
+	if len(mi.mdls) > 0 {
+		for index := len(mi.mdls) - 1; index >= 0; index-- {
+			root = mi.mdls[index](root)
+		}
+	}
+	root(ctx)
 }
