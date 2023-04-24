@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"net/http"
 	"testing"
 )
@@ -70,4 +71,24 @@ func TestMiddlerware(t *testing.T) {
 	})
 
 	server.Start(":8081")
+}
+
+func Test_TemplateEngine(t *testing.T) {
+	// 加载测试文件
+	tpl, err := template.ParseGlob("testdata/tpls/*.gohtml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tplEngine := &GoTemplateEngine{tpl}
+	server := NewHTTPServer(ServerAddTemplate(tplEngine))
+	server.Get("/login", func(ctx *Context) {
+		er := ctx.Render("login.gohtml", nil)
+		if er != nil {
+			t.Fatal(er)
+		}
+	})
+	err = server.Start(":8081")
+	if err != nil {
+		t.Fatal(err)
+	}
 }
