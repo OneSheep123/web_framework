@@ -142,3 +142,13 @@ func Test_FileUpload(t *testing.T) {
 	).Handle())
 	s.Start(":8081")
 }
+
+func Test_FileDownload(t *testing.T) {
+	s := NewHTTPServer()
+	s.Get("/download", (&FileDownloader{
+		// 下载的文件所在目录
+		Dir: "./testdata/download",
+	}).Handle())
+	// 在浏览器里面输入 localhost:8081/download?file=test.txt
+	s.Start(":8081")
+}
