@@ -1,10 +1,13 @@
 package web
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
+	"mime/multipart"
 	"net/http"
+	"path"
 	"testing"
 )
 
@@ -91,4 +94,51 @@ func Test_TemplateEngine(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func Test_FileUpload(t *testing.T) {
+	panicMiddle := func(next HandleFunc) HandleFunc {
+		return func(ctx *Context) {
+			defer func() {
+				if err := recover(); err != nil {
+					fmt.Println(err)
+				}
+			}()
+			next(ctx)
+		}
+	}
+	s := NewHTTPServer(ServerAddMiddleware(panicMiddle))
+	s.Get("/upload_page", func(ctx *Context) {
+		tpl := template.New("upload")
+		tpl, err := tpl.Parse(`
+<html>
+<body>
+	<form action="/upload" method="post" enctype="multipart/form-data">
+		 <input type="file" name="myfile" />
+		 <button type="submit">上传</button>
+	</form>
+</body>
+<html>
+`)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		page := &bytes.Buffer{}
+		err = tpl.Execute(page, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		ctx.RespStatusCode = 200
+		ctx.RespData = page.Bytes()
+	})
+
+	s.Post("/upload", NewFileUploader(
+		SetFileField("myfile"),
+		SetDstPathFunc(func(header *multipart.FileHeader) string {
+			return path.Join("testdata", "upload", header.Filename)
+		}),
+	).Handle())
+	s.Start(":8081")
 }
