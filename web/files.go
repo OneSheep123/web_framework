@@ -2,6 +2,7 @@
 package web
 
 import (
+	lru "github.com/hashicorp/golang-lru"
 	"io"
 	"log"
 	"mime/multipart"
@@ -93,4 +94,14 @@ func (f *FileDownloader) Handle() HandleFunc {
 		header.Set("Pragma", "public")
 		http.ServeFile(ctx.Resp, ctx.Req, path)
 	}
+}
+
+type StaticResourceHandler struct {
+	dir                     string
+	pathPrefix              string
+	extensionContentTypeMap map[string]string
+
+	// 缓存静态资源的限制
+	cache       *lru.Cache
+	maxFileSize int
 }

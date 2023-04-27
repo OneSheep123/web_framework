@@ -1,4 +1,4 @@
-// create by chencanhua in 2023/4/24
+// Package web create by chencanhua in 2023/4/24
 package web
 
 import (
@@ -13,7 +13,7 @@ import (
 type TemplateEngine interface {
 	// Render 渲染页面
 	// data 是渲染页面所需要的数据
-	Render(ctx context.Context, tplName string, data interface{}) ([]byte, error)
+	Render(ctx context.Context, tplName string, data any) ([]byte, error)
 }
 
 var _ TemplateEngine = &GoTemplateEngine{}
@@ -23,7 +23,7 @@ type GoTemplateEngine struct {
 	T *template.Template
 }
 
-func (g *GoTemplateEngine) Render(ctx context.Context, tplName string, data interface{}) ([]byte, error) {
+func (g *GoTemplateEngine) Render(ctx context.Context, tplName string, data any) ([]byte, error) {
 	res := &bytes.Buffer{}
 	err := g.T.ExecuteTemplate(res, tplName, data)
 	return res.Bytes(), err

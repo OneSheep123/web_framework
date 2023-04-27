@@ -23,7 +23,7 @@ type Context struct {
 }
 
 // Render 渲染静态数据
-func (c *Context) Render(tpl string, data interface{}) error {
+func (c *Context) Render(tpl string, data any) error {
 	var err error
 	c.RespData, err = c.tplEngine.Render(c.Req.Context(), tpl, data)
 	c.RespStatusCode = 200

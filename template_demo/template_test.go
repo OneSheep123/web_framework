@@ -1,5 +1,5 @@
 // create by chencanhua in 2023/4/24
-package template
+package template_demo
 
 import (
 	"bytes"
@@ -137,7 +137,7 @@ func TestPipeline(t *testing.T) {
 		name string
 
 		tpl  string
-		data interface{}
+		data any
 
 		want string
 	}{
