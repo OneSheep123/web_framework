@@ -20,6 +20,12 @@ type Context struct {
 	tplEngine TemplateEngine
 
 	cacheQueryValues url.Values
+
+	// 用户可以自由决定在这里存储什么，比如存储Session等
+	// 主要用于解决在不同 Middleware 之间数据传递的问题
+	// 但是要注意
+	// 1. UserValues 在初始状态的时候总是 nil，你需要自己手动初始化
+	UserValues map[string]any
 }
 
 // Render 渲染静态数据

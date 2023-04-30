@@ -2,7 +2,7 @@
 ## 使用
 
 ```go
- go mode tidy # 初始化模块
+ go mod tidy # 初始化模块
 ```
 
 ## 文件介绍 
