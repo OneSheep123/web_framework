@@ -17,7 +17,7 @@ type Store struct {
 	expiration time.Duration
 }
 
-// NewStore 创建一个 Store 的实例
+// NewStore 创建一个 store 的实例
 // 实际上，这里也可以考虑使用 Option 设计模式，允许用户控制过期检查的间隔
 func NewStore(expiration time.Duration) *Store {
 	return &Store{

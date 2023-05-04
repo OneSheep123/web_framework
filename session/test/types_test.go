@@ -5,12 +5,19 @@ import (
 	uuid2 "github.com/google/uuid"
 	"net/http"
 	"testing"
+	"time"
 	"web_framework/session"
+	"web_framework/session/cookie"
+	"web_framework/session/memory"
 	"web_framework/web"
 )
 
 func TestSession(t *testing.T) {
-	m := &session.Manager{}
+	// 内存测试
+	m := &session.Manager{
+		Store:      memory.NewStore(15 * time.Minute),
+		Propagator: cookie.NewPropagator(),
+	}
 	server := web.NewHTTPServer(web.ServerAddMiddleware(func(next web.HandleFunc) web.HandleFunc {
 		return func(ctx *web.Context) {
 			// 进行一个权限校验
@@ -64,8 +71,9 @@ func TestSession(t *testing.T) {
 	server.Get("/user", func(ctx *web.Context) {
 		sess, _ := m.GetSession(ctx)
 		// 假如说我要把昵称从 session 里面拿出来
-		val, _ := sess.Get(ctx.Req.Context(), "nickname")
+		val, _ := sess.Get(ctx.Req.Context(), "zhangsan")
 		ctx.RespData = []byte(val.(string))
+		ctx.RespStatusCode = http.StatusOK
 	})
 
 	server.Start(":8081")
