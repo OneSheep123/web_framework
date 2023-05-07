@@ -48,7 +48,9 @@ func ServerAddTemplate(template TemplateEngine) HTTPServerOptions {
 
 func NewHTTPServer(options ...HTTPServerOptions) *HTTPServer {
 	server := &HTTPServer{
-		router: newRouter(),
+		router: router{
+			trees: map[string]*node{},
+		},
 		Log: func(log string) {
 			fmt.Println(log)
 		},

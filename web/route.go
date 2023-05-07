@@ -11,12 +11,6 @@ type router struct {
 	trees map[string]*node
 }
 
-func newRouter() router {
-	return router{
-		trees: map[string]*node{},
-	}
-}
-
 // addRoute 注册路由。
 // method 是 HTTP 方法
 // - 已经注册了的路由，无法被覆盖。例如 /user/home 注册两次，会冲突

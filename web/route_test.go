@@ -74,7 +74,9 @@ func Test_router_AddRoute(t *testing.T) {
 	}
 
 	mockHandler := func(ctx *Context) {}
-	r := newRouter()
+	r := router{
+		trees: map[string]*node{},
+	}
 	for _, tr := range testRoutes {
 		r.addRoute(tr.method, tr.path, mockHandler)
 	}
@@ -126,7 +128,9 @@ func Test_router_AddRoute(t *testing.T) {
 	assert.True(t, ok, msg)
 
 	// 非法用例
-	r = newRouter()
+	r = router{
+		trees: map[string]*node{},
+	}
 
 	// 空字符串
 	assert.PanicsWithValue(t, "web: 路由是空字符串", func() {
@@ -171,12 +175,16 @@ func Test_router_AddRoute(t *testing.T) {
 		r.addRoute(http.MethodGet, "/a/b/:id", mockHandler)
 		r.addRoute(http.MethodGet, "/a/b/*", mockHandler)
 	})
-	r = newRouter()
+	r = router{
+		trees: map[string]*node{},
+	}
 	assert.PanicsWithValue(t, "web: 非法路由，已有通配符路由。不允许同时注册通配符路由和参数路由 [:id]", func() {
 		r.addRoute(http.MethodGet, "/*", mockHandler)
 		r.addRoute(http.MethodGet, "/:id", mockHandler)
 	})
-	r = newRouter()
+	r = router{
+		trees: map[string]*node{},
+	}
 	assert.PanicsWithValue(t, "web: 非法路由，已有路径参数路由。不允许同时注册通配符路由和参数路由 [*]", func() {
 		r.addRoute(http.MethodGet, "/:id", mockHandler)
 		r.addRoute(http.MethodGet, "/*", mockHandler)
@@ -429,7 +437,9 @@ func Test_router_findRoute(t *testing.T) {
 		},
 	}
 
-	r := newRouter()
+	r := router{
+		trees: map[string]*node{},
+	}
 	for _, tr := range testRoutes {
 		r.addRoute(tr.method, tr.path, mockHandler)
 	}
@@ -505,7 +515,9 @@ func Test_findRoute_Middleware(t *testing.T) {
 			mdls:   []Middleware{mdlBuilder('/')},
 		},
 	}
-	r := newRouter()
+	r := router{
+		trees: map[string]*node{},
+	}
 	for _, route := range testRoutes {
 		r.addRoute(route.method, route.path, nil, route.mdls...)
 	}
