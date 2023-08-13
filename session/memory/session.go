@@ -4,7 +4,7 @@ package memory
 import (
 	"context"
 	"fmt"
-	cache "github.com/patrickmn/go-cache"
+	"github.com/patrickmn/go-cache"
 	"sync"
 	"time"
 	"web_framework/session"
